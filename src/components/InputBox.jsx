@@ -7,15 +7,23 @@ export default function InputBox({ tabs, setTabs, activeTab }) {
   const [discrete, setDiscrete] = useState(false);
   const [noiseLevel, setNoiseLevel] = useState(0);
   const [message, setMessage] = useState("");
+  const [selectedSignalId, setSelectedSignalId] = useState(null);
 
-  const addSignal = () => {
-    const currentTab = tabs.find((t) => t.id === activeTab); // use activeTab
-    const id = currentTab.signals.length + 1;
+  const currentTab = tabs.find((t) => t.id === activeTab);
 
+  const selectSignal = (signal) => {
+    setSelectedSignalId(signal.id);
+    setEquation(signal.equation || "");
+    setMinX(signal.x[0] ?? 0);
+    setMaxX(signal.x[signal.x.length - 1] ?? 10);
+    setDiscrete(signal.discrete || false);
+    setNoiseLevel(signal.noiseLevel || 0);
+  };
+
+  const addOrUpdateSignal = () => {
     const N = discrete ? 50 : 500;
     const x = Array.from({ length: N }, (_, i) => minX + ((maxX - minX) * i) / (N - 1));
 
-    // Safe math evaluation for user input
     const safeEquation = equation
       .replace(/sin/g, "Math.sin")
       .replace(/cos/g, "Math.cos")
@@ -37,21 +45,34 @@ export default function InputBox({ tabs, setTabs, activeTab }) {
     }
 
     const newSignal = {
-      id,
-      name: `Signal ${id}: ${equation}`,
+      id: selectedSignalId ?? (currentTab.signals.length + 1),
+      name: `Signal ${selectedSignalId ?? (currentTab.signals.length + 1)}: ${equation}`,
       x,
       y,
+      equation,
+      discrete,
+      noiseLevel,
       type: "scatter",
       mode: "lines",
     };
 
+    let updatedSignals;
+    if (selectedSignalId) {
+      updatedSignals = currentTab.signals.map((s) =>
+        s.id === selectedSignalId ? newSignal : s
+      );
+    } else {
+      updatedSignals = [...currentTab.signals, newSignal];
+    }
+
     const updatedTabs = tabs.map((tab) =>
-      tab.id === activeTab ? { ...tab, signals: [...tab.signals, newSignal] } : tab
+      tab.id === activeTab ? { ...tab, signals: updatedSignals } : tab
     );
 
     setTabs(updatedTabs);
-    setMessage("Signal generated!");
-    setTimeout(() => setMessage(""), 2000); // message disappears after 2s
+    setMessage(selectedSignalId ? "Signal updated!" : "Signal generated!");
+    setSelectedSignalId(null);
+    setTimeout(() => setMessage(""), 2000);
   };
 
   const removeSignal = (signalId) => {
@@ -61,11 +82,12 @@ export default function InputBox({ tabs, setTabs, activeTab }) {
         : tab
     );
     setTabs(updatedTabs);
+    if (signalId === selectedSignalId) setSelectedSignalId(null);
   };
 
   return (
     <div className="flex flex-col gap-2 bg-gray-800 p-4 rounded mb-4">
-      <h2 className="text-xl font-bold">Add Signal</h2>
+      <h2 className="text-xl font-bold">{selectedSignalId ? "Update Signal" : "Add Signal"}</h2>
 
       {message && <div className="text-green-400 font-semibold">{message}</div>}
 
@@ -118,15 +140,15 @@ export default function InputBox({ tabs, setTabs, activeTab }) {
 
       <div className="flex gap-2 mt-2">
         <button
-          onClick={addSignal}
+          onClick={addOrUpdateSignal}
           className="bg-blue-600 hover:bg-blue-700 p-2 rounded w-40"
         >
-          Generate Signal
+          {selectedSignalId ? "Update Signal" : "Generate Signal"}
         </button>
 
-        {tabs.find((t) => t.id === activeTab)?.signals.length > 0 && (
+        {currentTab.signals.length > 0 && (
           <button
-            onClick={() => window.location.href = "#graph"}
+            onClick={() => (window.location.href = "#graph")}
             className="bg-green-600 hover:bg-green-700 p-2 rounded w-40"
           >
             Go to Graph
@@ -134,26 +156,27 @@ export default function InputBox({ tabs, setTabs, activeTab }) {
         )}
       </div>
 
-      {/* List of signals with remove option */}
-      {tabs.find((t) => t.id === activeTab)?.signals.length > 0 && (
+      {currentTab.signals.length > 0 && (
         <div className="mt-4 bg-gray-700 p-2 rounded max-h-40 overflow-auto">
           <h3 className="font-bold mb-1">Signals in this workspace:</h3>
-          {tabs
-            .find((t) => t.id === activeTab)
-            .signals.map((s) => (
-              <div
-                key={s.id}
-                className="flex justify-between items-center border-b border-gray-600 py-1"
+          {currentTab.signals.map((s) => (
+            <div
+              key={s.id}
+              className="flex justify-between items-center border-b border-gray-600 py-1 cursor-pointer"
+              onClick={() => selectSignal(s)}
+            >
+              <span>{s.name}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeSignal(s.id);
+                }}
+                className="bg-red-600 hover:bg-red-700 p-1 rounded text-xs"
               >
-                <span>{s.name}</span>
-                <button
-                  onClick={() => removeSignal(s.id)}
-                  className="bg-red-600 hover:bg-red-700 p-1 rounded text-xs"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+                Remove
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
