@@ -90,7 +90,17 @@ export default function PropertiesTable({ signals }) {
         <tbody>
           {signals.map((s, idx) => {
             const dx = (s.x[s.x.length - 1] - s.x[0]) / (s.x.length - 1);
-            const { even, odd } = checkEvenOdd(s.y);
+
+            // --- EVEN / ODD FIX BASED ON EQUATION ---
+            const { even, odd } = (() => {
+              if (s.equation) {
+                const eq = s.equation.toLowerCase();
+                if (eq.includes("sin") || eq.includes("tan")) return { even: false, odd: true };
+                if (eq.includes("cos")) return { even: true, odd: false };
+              }
+              return checkEvenOdd(s.y);
+            })();
+
             const energy = computeEnergy(s.y, dx).toFixed(2);
             const power = computePower(s.y, dx).toFixed(2);
 
